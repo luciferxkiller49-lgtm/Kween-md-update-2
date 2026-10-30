@@ -1,0 +1,27 @@
+{
+  "name": "QUEEN-MD",
+  "description": "Javascript WhatsApp bot made by 𝙌𝙐𝙀𝙀𝙉🦋-MD",
+  "logo": "https://files.catbox.moe/33a8lk.jpg",
+  "keywords": ["QUEEN-MD", "QUEEN🦋-MD"],
+  "success_url": "/",
+  "stack": "container",
+
+  "env": {
+    "MONGODB_URL": {
+      "description": "MongoDB connection string for database storage",
+      "required": false
+    },
+    "DB_NAME": {
+      "description": "Database name for MongoDB (default: queen)",
+      "required": false,
+      "value": "queen"
+    }
+  },
+
+  "buildpacks": [
+    {
+      "url": "https://github.com/heroku/heroku-buildpack-nodejs.git"
+    }
+  ],
+  "stack": "heroku-24"
+}
