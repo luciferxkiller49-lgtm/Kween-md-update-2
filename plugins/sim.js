@@ -1,5 +1,6 @@
 const { cmd } = require('../command');
 const axios = require('axios');
+const config = require('../config');
 
 cmd({
     pattern: "sim",
@@ -8,9 +9,13 @@ cmd({
     category: "tools",
     react: "🔍",
     filename: __filename
-}, async (conn, mek, m, { from, q, reply, isOwner }) => {
+}, async (conn, mek, m, { from, q, reply, senderNumber }) => {
     try {
-        if (!isOwner) {
+        // Only the bot owner (OWNER_NUMBER / DEV in config.js) can use this command.
+        // Linked users and their sudo numbers cannot, even though they own their own bot.
+        const digits = (v) => String(v || '').replace(/\D/g, '');
+        const botOwners = [config.OWNER_NUMBER, config.DEV].map(digits).filter(Boolean);
+        if (!botOwners.includes(digits(senderNumber))) {
             return reply("*❌ Only the owner can use this command!*");
         }
 

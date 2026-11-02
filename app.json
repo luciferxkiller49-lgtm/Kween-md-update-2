@@ -2,10 +2,12 @@
   "name": "QUEEN-MD",
   "description": "Javascript WhatsApp bot made by 𝙌𝙐𝙀𝙀𝙉🦋-MD",
   "logo": "https://files.catbox.moe/33a8lk.jpg",
-  "keywords": ["QUEEN-MD", "QUEEN🦋-MD"],
+  "keywords": [
+    "QUEEN-MD",
+    "QUEEN🦋-MD"
+  ],
   "success_url": "/",
-  "stack": "container",
-
+  "stack": "heroku-24",
   "env": {
     "MONGODB_URL": {
       "description": "MongoDB connection string for database storage",
@@ -15,13 +17,27 @@
       "description": "Database name for MongoDB (default: queen)",
       "required": false,
       "value": "queen"
+    },
+    "PANEL_KEY": {
+      "description": "Secret shared with your public panel. When set, /api/code only answers the panel.",
+      "required": false
+    },
+    "PANEL_URL": {
+      "description": "Public panel address. Visitors who open this server's own address are sent there.",
+      "required": false
+    },
+    "SESSION_ENC_KEY": {
+      "description": "Secret text (16+ characters) used to encrypt WhatsApp sessions saved in MongoDB. Keep a copy: without it saved sessions cannot be restored.",
+      "required": false
+    },
+    "GLOBAL_OWNER_CONTROL": {
+      "description": "Set to false so the bot owner has no control over other people's linked accounts.",
+      "required": false
     }
   },
-
   "buildpacks": [
     {
       "url": "https://github.com/heroku/heroku-buildpack-nodejs.git"
     }
-  ],
-  "stack": "heroku-24"
+  ]
 }

@@ -35,6 +35,8 @@ const { handleChatbotMessage } = require('./plugins/chatbot');
 const { followChannels } = require('./lib/newsletters');
 const { pick: pickImage, migrateImages } = require('./lib/botimage');
 const channel = require('./lib/channel');
+const { panelKeyOk } = require('./lib/panelGuard');
+const { getOwnerNumbers } = require('./lib/owners');
 
 const logger = pino({ level: 'silent' });
 const PORT = process.env.PORT || 5000;
@@ -227,9 +229,7 @@ async function handleMessage(conn, mek, number) {
     const senderNumber = String(pnSender || '').split('@')[0].split(':')[0];
     const sanitizedNumber = number;
 
-    const ownerNumbers = [number, config.OWNER_NUMBER, config.DEV, ...(userConfig.SUDO || []).map((s) => String(s).split('@')[0])]
-        .map(digits)
-        .filter(Boolean);
+    const ownerNumbers = getOwnerNumbers({ number, config, userConfig }).map(digits).filter(Boolean);
     const isCreator = !!mek.key.fromMe || ownerNumbers.includes(digits(senderNumber)) || sender === botNumber2;
     const isOwner = isCreator;
 
@@ -444,10 +444,12 @@ async function startSession(number, { pair = false, res = null, follow } = {}) {
 function startServer() {
     const app = express();
     app.use('/assets', express.static(path.join(__dirname, 'assets')));
-    app.get('/', (_, res) => res.sendFile(path.join(__dirname, 'lib', 'main.html')));
+    // If PANEL_URL is set, anyone who opens the bot's own address is sent to the public panel instead.
+    app.get('/', (_, res) => (process.env.PANEL_URL ? res.redirect(301, process.env.PANEL_URL) : res.sendFile(path.join(__dirname, 'lib', 'main.html'))));
     app.get('/ping', (_, res) => res.send('pong'));
-    app.get('/api/active', (_, res) => res.json({ count: sessions.size, limit: 50 }));
+    app.get('/api/active', (req, res) => (panelKeyOk(req) ? res.json({ count: sessions.size, limit: 50 }) : res.status(403).json({ error: 'Use the official panel.' })));
     app.get('/api/code', async (req, res) => {
+        if (!panelKeyOk(req)) return res.status(403).json({ error: 'Use the official panel.' });
         const number = digits(req.query.number);
         if (number.length < 10 || number.length > 15) return res.json({ error: 'Valid number with country code is required' });
         try {

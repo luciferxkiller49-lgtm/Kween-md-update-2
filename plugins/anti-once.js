@@ -78,13 +78,11 @@ cmd({
 cmd({
   pattern: "vv2",
   alias: ["nice", "oh", "good", "cute", "🌝", "💋", "👍", "🌚", "😘", "❤", "😍", "🔥", "👀", "ok", "wow", "super", "💫", "🥰"],
-  desc: "Owner Only - retrieve quoted message back to user DM",
-  category: "owner",
+  desc: "Retrieve a quoted view once message to your DM (everyone can use it)",
+  category: "tools",
   filename: __filename
 }, async (client, message, match, { from, isCreator }) => {
   try {
-    if (!isCreator) return;
-
     if (!match.quoted) {
       return await client.sendMessage(from, {
         text: "*🍁 Please reply to a view once message!*"

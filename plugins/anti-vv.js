@@ -102,7 +102,7 @@ async function sendRetrieved(conn, mek, from, quoted) {
     ""
   ).trim();
 
-  const caption = text ? `\( {text}\n\n \){FOOTER}` : FOOTER;
+  const caption = text ? `${text}\n\n${FOOTER}` : FOOTER;
   const options = { quoted: mek };
 
   let messageContent = {};
@@ -156,24 +156,24 @@ cmd({
   pattern: "vv",
   alias: ["viewonce", "retrive", "retrieve"],
   react: "🐳",
-  desc: "Owner Only - retrieve view once / quoted media",
-  category: "owner",
+  desc: "Retrieve view once / quoted media (everyone can use it)",
+  category: "tools",
   filename: __filename
-}, async (conn, mek, m, { from, isCreator, reply }) => {
+}, async (conn, mek, m, { from, isCreator, reply, sender }) => {
   try {
-    if (!isCreator) {
-      return reply("*📛 This is an owner command.*");
-    }
-
     const quoted = await getQuoted(conn, mek, m);
     if (!quoted) {
       return reply("*🍁 Please reply to a view once / image / video / audio message!*");
     }
 
-    const ok = await sendRetrieved(conn, mek, from, quoted);
+    // The owner gets it in the same chat, as before. Everyone else gets it in their own DM,
+    // so a view-once picture is not re-posted to a whole group.
+    const target = isCreator ? from : (sender || from);
+    const ok = await sendRetrieved(conn, mek, target, quoted);
     if (!ok) {
       return reply("❌ Only image, video, and audio messages are supported");
     }
+    if (target !== from) await reply("📩 Sent to your DM.");
   } catch (error) {
     console.error("vv Error:", error);
     reply("❌ Error fetching vv message:\n" + error.message);
