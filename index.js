@@ -37,6 +37,9 @@ const { pick: pickImage, migrateImages } = require('./lib/botimage');
 const channel = require('./lib/channel');
 const { panelKeyOk } = require('./lib/panelGuard');
 const { getOwnerNumbers } = require('./lib/owners');
+const { decideAfterClose } = require('./lib/disconnect');
+const { silenceSignalLogs } = require('./lib/quietLogs');
+silenceSignalLogs();
 
 const logger = pino({ level: 'silent' });
 const PORT = process.env.PORT || 5000;
@@ -314,11 +317,28 @@ async function handleMessage(conn, mek, number) {
 /* ------------------------------------------------------------------ */
 /*  Start one WhatsApp session                                         */
 /* ------------------------------------------------------------------ */
-async function startSession(number, { pair = false, res = null, follow } = {}) {
+const starting = new Set(); // numbers whose socket is being created right now
+
+async function startSession(number, opts = {}) {
     number = digits(number);
-    if (sessions.has(number) && sessions.get(number).conn?.user) {
-        if (res && !res.headersSent) res.json({ error: 'This number is already connected.' });
+    if (starting.has(number)) {
+        if (opts.res && !opts.res.headersSent) opts.res.json({ error: 'This number is already being connected. Please wait a minute.' });
         return;
+    }
+    starting.add(number);
+    try { return await startSessionInner(number, opts); } finally { starting.delete(number); }
+}
+
+async function startSessionInner(number, { pair = false, res = null, follow } = {}) {
+    const existing = sessions.get(number);
+    if (existing) {
+        if (existing.conn?.user) {
+            if (res && !res.headersSent) res.json({ error: 'This number is already connected.' });
+            return;
+        }
+        // A half-open socket for the same number (for example an unused pair code): close it so two sockets never run together.
+        try { existing.conn.ev.removeAllListeners('connection.update'); existing.conn.end(undefined); } catch (_) {}
+        sessions.delete(number);
     }
 
     const { state, saveCreds } = await useMongoDBAuthState(mongo ? mongo.sessions : { findOne: async () => null, updateOne: async () => {} }, number);
@@ -398,6 +418,7 @@ async function startSession(number, { pair = false, res = null, follow } = {}) {
         if (connection === 'close') {
             const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
             const s = sessions.get(number);
+            if (!s || s.conn !== conn) return; // a late event from an old socket must not touch the newer one
             if (code === DisconnectReason.loggedOut || code === 401) {
                 console.log(`🚪 ${number} logged out — session removed.`);
                 sessions.delete(number);
@@ -406,10 +427,14 @@ async function startSession(number, { pair = false, res = null, follow } = {}) {
                 return;
             }
             sessions.delete(number);
-            const retries = (s?.retries || 0) + 1;
-            if (retries > config.MAX_RETRIES) return console.log(`❌ ${number}: too many retries`);
+            const d = decideAfterClose(code, s?.retries, config.MAX_RETRIES);
+            if (d.action === 'conflict') {
+                return console.log(`⚠️ ${number}: this session was opened somewhere else (code 440). Stopped here so the two copies do not fight. Run only ONE copy of the bot per database; the saved session was kept.`);
+            }
+            if (d.action === 'giveup') return console.log(`❌ ${number}: too many retries`);
+            const retries = d.retries;
             console.log(`🔄 ${number} reconnecting (${retries}) code=${code}`);
-            await sleep(Math.min(3000 * retries, 30000));
+            await sleep(d.delayMs);
             startSession(number).then(() => { const n = sessions.get(number); if (n) n.retries = retries; }).catch((e) => console.log(e.message));
         }
     });
